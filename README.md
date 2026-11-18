@@ -79,3 +79,10 @@ python scripts/build_report.py
 ```
 
 For the report cover, supply `report/team.json` as an array of four objects with `name` and `srn` keys. Pass the public repository URL to the report builder with `--repo`. The PDF and its evidence are separate from the GitHub source deliverable. During the physical demo, capture the receiving laptop's terminal after inference requests and include that evidence according to the submission guide.
+
+## Team
+
+- [Ashith Rao K](https://github.com/DarthCoder01)
+- [Ronak M Surana](https://github.com/ronakmsurana)
+- [Arati](https://github.com/Arati-mb)
+- [Ruturaj Rajaram Shedbale](https://github.com/ruturajshedbale)
