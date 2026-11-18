@@ -172,7 +172,9 @@ if run_btn:
                         center_lat = sum(p[0] for p in gps_pts) / len(gps_pts)
                         center_lon = sum(p[1] for p in gps_pts) / len(gps_pts)
 
-                        fmap = folium.Map(location=[center_lat, center_lon], zoom_start=14, tiles="OpenStreetMap")
+                        esri_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+                        esri_attr = "Tiles &copy; Esri &mdash; Street Map"
+                        fmap = folium.Map(location=[center_lat, center_lon], zoom_start=14, tiles=esri_url, attr=esri_attr)
 
                         # Layer 1: Raw GPS Points
                         fg_gps = folium.FeatureGroup(name="Noisy GPS Observations (Blue)", show=True)

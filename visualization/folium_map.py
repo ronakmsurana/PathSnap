@@ -34,11 +34,25 @@ def create_trip_folium_map(
     center_lat = float(np.mean(track[:, 1]))
     center_lon = float(np.mean(track[:, 0]))
 
+    # Use reliable high-resolution Esri WorldStreetMap tiles (avoids OSM tile usage blocks)
+    esri_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+    esri_attr = "Tiles &copy; Esri &mdash; Street Map"
+
     fmap = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=14,
-        tiles="OpenStreetMap"
+        tiles=esri_url,
+        attr=esri_attr
     )
+
+    # Add Esri Topographic as an alternative base layer
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+        attr="Tiles &copy; Esri &mdash; Topographic",
+        name="Esri Topographic",
+        overlay=False,
+        control=True
+    ).add_to(fmap)
 
     # Feature groups for toggleable layers
     fg_road_network = folium.FeatureGroup(name="Road Network (Sub-graph)", show=False)
