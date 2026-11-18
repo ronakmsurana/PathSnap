@@ -190,9 +190,9 @@ def build(results, evidence, members_path, repo):
       f"without a positive candidate, and uses {metrics['candidate_fit_rows']:,} candidate rows in the full "
       f"fit. Validation and student testing score all aligned observations, including misses for Top-1. "
       f"Candidate classification metrics use a 0.5 probability cutoff. Inference times sum candidate scoring "
-      f"over the ten student trips. {winner} led grouped CV macro F1 and was selected for tuning.")
-    table(["Model / family", "CV F1", "Top-1", "Cont.", "Macro P / R / F1", "Log loss", "Infer. s"],
-          [[f"{name} / {v['family']}", f"{v['cv_macro_f1']:.3f}", pct(v["student"]["top1"]),
+      f"over the ten student trips. Macro F1 weights both classes equally despite the many incorrect candidates per fix. {winner} led on this criterion.")
+    table(["Model / family / key setting", "CV F1", "Top-1", "Cont.", "Macro P / R / F1", "Log loss", "Infer. s"],
+          [[f"{name} / {v['family']} / {next(iter(v['config']))}={next(iter(v['config'].values()))}", f"{v['cv_macro_f1']:.3f}", pct(v["student"]["top1"]),
             pct(routes[name]["continuity"]),
             " / ".join(f"{v['student'][m]:.3f}" for m in ("macro_precision", "macro_recall", "macro_f1")),
             f"{v['student']['log_loss']:.3f}", f"{v['student']['inference_s']:.2f}"]
@@ -202,9 +202,23 @@ def build(results, evidence, members_path, repo):
     p(f"Nearest-segment baseline reached {pct(baseline['top1'])} Top-1 and "
       f"{pct(routes['Nearest Segment']['continuity'])} continuity. It selects a geometry rank, so "
       "probability log loss is omitted.")
-    image("model_comparison.png", 492, 378)
+    new_page("3.1 Model comparison across trips")
+    image("model_comparison.png", 492, 360)
     p("Candidate F1 and log loss evaluate binary match scores. Top-1 evaluates which arc wins within "
       "each observation, so the metrics can move in different directions.", "caption")
+
+    audit_file = results / "overfitting_audit.json"
+    if audit_file.exists():
+        audit = read(audit_file)
+        p("Generalization on unseen trips", "h2")
+        p("The deployed configuration was refit on each saved split. Both sides were scored on all "
+          "aligned observations from their respective trips using the same candidate rules.")
+        table(["Fold", "Fit macro F1", "Held-out F1", "Fit Top-1", "Held-out Top-1"],
+              [[r["fold"], f'{r["fit"]["macro_f1"]:.4f}', f'{r["validation"]["macro_f1"]:.4f}',
+                pct(r["fit"]["top1"]), pct(r["validation"]["top1"])] for r in audit],
+              [52, 110, 110, 110, 110])
+        p("These folds also guided hyperparameter selection. Fold variation describes sensitivity "
+          "to the trip mix. The reserved evaluation remains the independent check.", "caption")
 
     new_page("3.2 Per-model findings")
     for name, v in metrics["models"].items():
@@ -213,10 +227,8 @@ def build(results, evidence, members_path, repo):
         valid = v["cv_macro_f1"]
         gap = fit - valid
         interpretation = (
-            f"The {gap:.3f} training-to-validation F1 gap suggests some overfitting."
-            if gap >= .018 else
-            f"Fit and validation F1 differ by {gap:+.3f}. This comparison gives little evidence of a large "
-            "overfit gap, though they contain different trips and alignment cases."
+            f"The fit-minus-validation difference is {gap:+.3f}. The comparison mixes sampling effects "
+            "and generalization because fitting omits candidate misses and caps observations per trip."
         )
         p(name, "h2")
         p(f"{MODEL_DETAILS[name]} Settings: {escape(params(v['config']))}. "

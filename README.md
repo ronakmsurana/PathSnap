@@ -18,6 +18,7 @@ Place the supplied data at `Student folder/train/<trip_id>/` and `Student folder
 python -m pathsnap.prepare
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 python -m pathsnap.train
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 python -m pathsnap.route_eval
+OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 python -m pathsnap.audit_folds
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 python -m pathsnap.visualize
 ```
 
