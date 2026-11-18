@@ -4,6 +4,17 @@
 
 ---
 
+## 🚀 Master Jupyter Notebook: `PathSnap_Pipeline.ipynb`
+
+All Review 1 deliverables—data pre-processing, spatial projection, STRtree candidate generation, miss rate audit, 13-feature extraction, 6-model benchmark, training time recording, `.pkl` parameter tracking, and interactive Folium maps—are compiled into a single executable master notebook:
+
+```bash
+jupyter notebook PathSnap_Pipeline.ipynb
+```
+*All cells are pre-executed with tables, training times, serialized `.pkl` parameters, and interactive visual outputs embedded.*
+
+---
+
 ## Review 1 Overview: Pre-Processing, Feature Engineering & Baseline Models
 
 This branch contains our completed **Review 1** milestone deliverables:
