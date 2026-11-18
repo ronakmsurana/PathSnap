@@ -26,7 +26,7 @@ from reportlab.pdfgen import canvas
 
 
 class NumberedCanvas(canvas.Canvas):
-    """Two-pass canvas for dynamic total page count, running headers, and footers."""
+    """Two-pass canvas for dynamic total page count, keeping only page numbers."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
@@ -47,23 +47,9 @@ class NumberedCanvas(canvas.Canvas):
         self.saveState()
         self.setFont("Helvetica", 8)
         self.setFillColor(colors.HexColor("#4B5563"))
-
-        # Running header on pages 2+
-        if self._pageNumber > 1:
-            self.drawString(36, 762, "PathSnap: Distributed Map-Matching & Route Reconstruction")
-            self.drawRightString(576, 762, "PES University | UE24CS352A ML Hackathon")
-            self.setStrokeColor(colors.HexColor("#CBD5E1"))
-            self.setLineWidth(0.5)
-            self.line(36, 756, 576, 756)
-
-        # Running footer on all pages
-        self.setFont("Helvetica", 8)
-        self.drawString(36, 25, "Confidential & Academic Submission | PES University Dept of Computer Science & Engineering")
+        # Only page number at bottom right
         page_str = f"Page {self._pageNumber} of {num_pages}"
-        self.drawRightString(576, 25, page_str)
-        self.setStrokeColor(colors.HexColor("#CBD5E1"))
-        self.setLineWidth(0.5)
-        self.line(36, 33, 576, 33)
+        self.drawRightString(576, 24, page_str)
         self.restoreState()
 
 
@@ -78,8 +64,8 @@ def build_pdf_report(
         pagesize=letter,
         rightMargin=36,
         leftMargin=36,
-        topMargin=38,
-        bottomMargin=38
+        topMargin=36,
+        bottomMargin=36
     )
 
     styles = getSampleStyleSheet()
@@ -104,12 +90,22 @@ def build_pdf_report(
     subtitle_style = ParagraphStyle(
         "ReportSubTitle",
         parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=10,
+        fontName="Helvetica-Bold",
+        fontSize=9.5,
         leading=13,
         textColor=MUTED_TEXT,
         alignment=1,
-        spaceAfter=8
+        spaceAfter=6
+    )
+
+    team_style = ParagraphStyle(
+        "TeamMember",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8.5,
+        leading=11.5,
+        textColor=DARK_TEXT,
+        alignment=1
     )
 
     h1_style = ParagraphStyle(
@@ -193,13 +189,31 @@ def build_pdf_report(
     story = []
 
     # =========================================================================
-    # PAGE 1: TITLE, METADATA & SECTION 2.2 (DATASET & EDA)
+    # PAGE 1: TITLE, TEAM MEMBERS, METADATA & SECTION 2.2 (DATASET & EDA)
     # =========================================================================
-    story.append(Paragraph("PES UNIVERSITY | DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING", ParagraphStyle("Uni", fontName="Helvetica-Bold", fontSize=10.5, leading=12, alignment=1, textColor=PRIMARY)))
-    story.append(Paragraph("UE24CS352A Machine Learning Hackathon | Final Technical Report", ParagraphStyle("Dept", fontName="Helvetica", fontSize=8.5, leading=11, alignment=1, textColor=MUTED_TEXT)))
-    story.append(Spacer(1, 3))
     story.append(Paragraph("PATHSNAP: DISTRIBUTED MAP-MATCHING & ROUTE RECONSTRUCTION", title_style))
-    story.append(Paragraph("Sequential Trajectory Reconstruction from 1 Hz Noisy GPS Streams", subtitle_style))
+    story.append(Paragraph("UE24CS352A Machine Learning Hackathon | Final Technical Report", subtitle_style))
+    story.append(Spacer(1, 2))
+
+    # Team Members Block
+    team_data = [
+        [
+            Paragraph("<b>PES1UG24CS605</b> &nbsp; RONAK M SURANA", team_style),
+            Paragraph("<b>PES1UG24CS559</b> &nbsp; ASHITH RAO K", team_style)
+        ],
+        [
+            Paragraph("<b>PES1UG24CS558</b> &nbsp; ARATI", team_style),
+            Paragraph("<b>PES1UG24CS606</b> &nbsp; RUTURAJ RAJARAM SHEDBALE", team_style)
+        ]
+    ]
+    t_team = Table(team_data, colWidths=[270, 270])
+    t_team.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 1.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
+    ]))
+    story.append(t_team)
+    story.append(Spacer(1, 4))
     story.append(HRFlowable(width="100%", thickness=1.2, color=PRIMARY, spaceAfter=5))
 
     # Meta Table
@@ -619,10 +633,6 @@ def build_pdf_report(
         "&bull; <b>Deployment Command:</b> Backend: `uvicorn api.main:app --host 0.0.0.0 --port 8000`. Frontend: `streamlit run ui/app.py`.",
         body_style
     ))
-
-    story.append(Spacer(1, 3))
-    story.append(HRFlowable(width="100%", thickness=0.8, color=PRIMARY, spaceAfter=3))
-    story.append(Paragraph("PathSnap UE24CS352A Machine Learning Hackathon | Department of CSE, PES University", ParagraphStyle("Foot", fontName="Helvetica-Oblique", fontSize=7.5, alignment=1, textColor=MUTED_TEXT)))
 
     doc.build(story, canvasmaker=NumberedCanvas)
     print(f"ReportLab PDF compiled successfully: {output_pdf}")
