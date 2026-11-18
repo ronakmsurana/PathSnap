@@ -39,8 +39,11 @@ wheels/
 
 # Large raw data (read directly from parent dataset directory)
 data/raw/
+data/processed/
+*.npz
 *.mp4
 *.zip
+artifacts/random_forest.joblib
 
 # Logs
 *.log
