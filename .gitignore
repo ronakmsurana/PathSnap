@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.nbc
+*.nbi
+.cache/
+Student folder/
+PathSnap_student_materials/
+*.zip
+evaluator_test/
+private/
+report/

@@ -1,0 +1,28 @@
+{
+  "train": {
+    "trips": 80,
+    "observations": 208417,
+    "aligned": 188413,
+    "candidate_hits": 185717,
+    "nearest_fallback": 16599,
+    "nonfinite": 0,
+    "reference_breaks": 13,
+    "gaps_over_30s": 133,
+    "one_second_steps": 201048,
+    "max_gap_s": 153064.0,
+    "candidate_miss_rate": 0.01430899141778963
+  },
+  "student_test": {
+    "trips": 10,
+    "observations": 19160,
+    "aligned": 19157,
+    "candidate_hits": 19109,
+    "nearest_fallback": 0,
+    "nonfinite": 0,
+    "reference_breaks": 1,
+    "gaps_over_30s": 2,
+    "one_second_steps": 18886,
+    "max_gap_s": 210.0,
+    "candidate_miss_rate": 0.0025056115258129674
+  }
+}

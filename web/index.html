@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PathSnap · Route reconstruction</title>
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="vendor/leaflet.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="identity">
+      <span class="brand-icon" aria-hidden="true">⌁</span>
+      <div><h1>PathSnap</h1><p>Route reconstruction</p></div>
+    </div>
+    <span id="connection" class="connection" role="status">Awaiting server</span>
+  </header>
+  <main>
+    <aside>
+      <section>
+        <h2>Inference server</h2>
+        <form id="server-form">
+          <label for="server">API address</label>
+          <input id="server" type="url" value="http://127.0.0.1:8000" required>
+          <button id="connect" type="submit" class="secondary">Connect</button>
+        </form>
+      </section>
+      <section>
+        <h2>Trip</h2>
+        <form id="match-form">
+          <label for="trip">Select a trip</label>
+          <select id="trip" disabled><option>Connect to load trips</option></select>
+          <button id="run" type="submit" disabled>Reconstruct route</button>
+        </form>
+        <p id="status" class="status" role="status">Connect to the PathSnap API to get started.</p>
+      </section>
+      <section aria-labelledby="metric-label">
+        <h2 id="metric-label">Evaluation</h2>
+        <dl>
+          <div><dt>Top-1 accuracy</dt><dd id="accuracy">—</dd></div>
+          <div><dt>Route continuity</dt><dd id="continuity">—</dd></div>
+          <div><dt>Ordered route F1</dt><dd id="sequence">—</dd></div>
+          <div><dt>Inference time</dt><dd id="runtime">—</dd></div>
+        </dl>
+        <p id="details" class="status" hidden></p>
+      </section>
+    </aside>
+    <section class="map-panel" aria-label="Trip map">
+      <div id="map"></div>
+      <div id="map-empty" class="map-empty">A reconstructed trip will appear here.</div>
+    </section>
+  </main>
+</body>
+</html>
