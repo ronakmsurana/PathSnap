@@ -11,9 +11,13 @@ import json
 import folium
 from folium import plugins
 import numpy as np
+import pandas as pd
+import joblib
 from typing import Optional, List, Dict, Tuple
 
 from data_processing.loader import TripData, load_trip, list_trip_ids
+from feature_engineering.candidate_generator import SpatialCandidateGenerator
+from feature_engineering.extractor import CandidateFeatureExtractor
 
 
 # Distinct palette for multi-trip overlays
@@ -33,6 +37,45 @@ ESRI_STREET_ATTR = "Tiles &copy; Esri &mdash; Street Map"
 
 ESRI_TOPO_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
 ESRI_TOPO_ATTR = "Tiles &copy; Esri &mdash; Topographic"
+
+
+def predict_trip_route(
+    trip: TripData,
+    model_path: str = "artifacts/lightgbm.joblib"
+) -> List[int]:
+    """
+    Runs spatial candidate generation, feature extraction, and ML scoring
+    using the trained LightGBM model to predict the reconstructed sequence of road arcs.
+    """
+    if not os.path.exists(model_path):
+        print(f"Warning: Model path {model_path} not found. Skipping prediction.")
+        return []
+
+    gen = SpatialCandidateGenerator(search_radius_meters=45.0, fallback_k=3)
+    candidates_list, _ = gen.generate_trip_candidates(trip, align_route=False)
+
+    extractor = CandidateFeatureExtractor()
+    X, _, metadata = extractor.extract_features_for_trip(trip, candidates_list, include_label=False)
+
+    if len(X) == 0:
+        return []
+
+    model = joblib.load(model_path)
+    probs = model.predict_proba(X)[:, 1]
+
+    meta_df = pd.DataFrame(metadata)
+    meta_df["prob"] = probs
+
+    best_rows = meta_df.loc[meta_df.groupby("point_idx")["prob"].idxmax()].sort_values("point_idx")
+    raw_arcs = best_rows["arc_id"].tolist()
+
+    # Deduplicate sequential duplicates to form continuous road segment sequence
+    reconstructed_route = []
+    for arc in raw_arcs:
+        if len(reconstructed_route) == 0 or reconstructed_route[-1] != arc:
+            reconstructed_route.append(int(arc))
+
+    return reconstructed_route
 
 
 def create_trip_folium_map(
@@ -69,8 +112,8 @@ def create_trip_folium_map(
 
     fg_road_network = folium.FeatureGroup(name="Road Network (Sub-graph)", show=False)
     fg_raw_gps = folium.FeatureGroup(name=f"Trip {trip.trip_id}: Raw GPS Observations", show=True)
-    fg_ground_truth = folium.FeatureGroup(name=f"Trip {trip.trip_id}: Ground-Truth Route", show=True)
-    fg_predicted = folium.FeatureGroup(name=f"Trip {trip.trip_id}: Predicted Route", show=True)
+    fg_ground_truth = folium.FeatureGroup(name=f"Trip {trip.trip_id}: Ground-Truth Route (Green)", show=True)
+    fg_predicted = folium.FeatureGroup(name=f"Trip {trip.trip_id}: Predicted Route (Red)", show=True)
 
     min_lon, max_lon = track[:, 0].min() - 0.015, track[:, 0].max() + 0.015
     min_lat, max_lat = track[:, 1].min() - 0.015, track[:, 1].max() + 0.015
@@ -126,41 +169,56 @@ def create_trip_folium_map(
                     tooltip=f"Ground Truth Arc: {arc_id}"
                 ).add_to(fg_ground_truth)
 
+    has_predictions = False
     if predicted_arcs is not None and len(predicted_arcs) > 0:
+        has_predictions = True
         for arc_id in predicted_arcs:
             if arc_id < len(arcs):
                 u, v = arcs[arc_id]
                 folium.PolyLine(
                     locations=[[nodes[u, 1], nodes[u, 0]], [nodes[v, 1], nodes[v, 0]]],
                     color="#D32F2F",
-                    weight=4,
+                    weight=4.5,
                     opacity=0.9,
                     dash_array="6, 8",
-                    tooltip=f"Predicted Arc: {arc_id}"
+                    tooltip=f"Predicted Road Arc: {arc_id}"
                 ).add_to(fg_predicted)
 
     fg_road_network.add_to(fmap)
     fg_raw_gps.add_to(fmap)
     fg_ground_truth.add_to(fmap)
-    if predicted_arcs is not None:
+    if has_predictions:
         fg_predicted.add_to(fmap)
 
     folium.LayerControl(collapsed=False).add_to(fmap)
     plugins.Fullscreen(position="topright").add_to(fmap)
 
+    # Dynamic legend line for predicted route
+    if has_predictions:
+        if route is not None and len(route) > 0:
+            overlap = len(set(route).intersection(set(predicted_arcs)))
+            overlap_pct = (overlap / len(set(route))) * 100.0
+            pred_legend_line = f'<i style="background: #D32F2F; width: 14px; height: 4px; display: inline-block;"></i> <b>Predicted Route</b> ({len(predicted_arcs)} arcs | <span style="color:#2E7D32; font-weight:700;">{overlap_pct:.1f}% match</span>)<br>'
+        else:
+            pred_legend_line = f'<i style="background: #D32F2F; width: 14px; height: 4px; display: inline-block;"></i> <b>Predicted Route</b> ({len(predicted_arcs)} arcs)<br>'
+    else:
+        pred_legend_line = '<i style="color: #94a3b8; font-size: 11px;">⚠️ Predicted Route: Not rendered in this view</i><br>'
+
     legend_html = f'''
     <div style="
         position: fixed; 
-        bottom: 30px; left: 30px; width: 240px; height: 140px; 
-        background-color: white; border:2px solid grey; z-index:9999; font-size:12px;
-        padding: 10px; border-radius: 8px; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        bottom: 30px; left: 30px; width: 280px; min-height: 140px; 
+        background-color: white; border: 2px solid #cbd5e1; z-index: 9999; font-size: 12px;
+        padding: 12px; border-radius: 8px; box-shadow: 2px 2px 8px rgba(0,0,0,0.25);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     ">
-    <b>PathSnap: Trip {trip.trip_id}</b><br>
-    <i style="background: #2196F3; width: 10px; height: 10px; display: inline-block; border-radius: 50%;"></i> Noisy GPS Observations<br>
+    <div style="font-weight: 700; font-size: 13px; color: #1e3a8a; margin-bottom: 6px;">PathSnap: Trip {trip.trip_id}</div>
+    <i style="background: #2196F3; width: 10px; height: 10px; display: inline-block; border-radius: 50%;"></i> Noisy GPS Observations ({len(track)} pts)<br>
     <i style="background: #888888; width: 14px; height: 3px; display: inline-block;"></i> Local Road Network<br>
-    <i style="background: #2E7D32; width: 14px; height: 4px; display: inline-block;"></i> Ground-Truth Reference<br>
-    <i style="background: #D32F2F; width: 14px; height: 4px; display: inline-block;"></i> Predicted Route<br>
-    <small style="color: gray;">Observations: {len(track)} | Arcs: {len(route) if route is not None else 0}</small>
+    <i style="background: #2E7D32; width: 14px; height: 4px; display: inline-block;"></i> Ground-Truth Reference ({len(route) if route is not None else 0} arcs)<br>
+    {pred_legend_line}
+    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 6px 0;">
+    <small style="color: #64748b;">Toggle layers on/off via control panel (top right)</small>
     </div>
     '''
     fmap.get_root().html.add_child(folium.Element(legend_html))
@@ -468,3 +526,60 @@ def create_trip_navigator_html(
     with open(output_html_path, "w") as f:
         f.write(hub_html)
     print(f"Saved Interactive Trip Navigator Hub to: {output_html_path}")
+
+
+def generate_all_visualizations(
+    trip_ids: Optional[List[str]] = None,
+    dataset_dirs: Optional[List[str]] = None,
+    output_dir: str = "results/folium_maps",
+    model_path: str = "artifacts/lightgbm.joblib"
+):
+    """
+    Renders all individual trip maps with ML predicted routes,
+    the multi-trip comparison map, and the trip navigator portal.
+    """
+    if trip_ids is None:
+        trip_ids = ['00000000', '00000005', '00000007', '00000009', '00000052', '00000056', '00000076', '00000091']
+
+    if dataset_dirs is None:
+        dataset_dirs = ['../Student folder/student_test', '../Student folder/train', 'Student folder/student_test', 'Student folder/train']
+
+    os.makedirs(output_dir, exist_ok=True)
+    loaded_trips = []
+
+    for tid in trip_ids:
+        trip = None
+        for d in dataset_dirs:
+            candidate_path = os.path.join(d, tid)
+            if os.path.exists(candidate_path):
+                try:
+                    trip = load_trip(d, tid, load_route=True)
+                    break
+                except Exception:
+                    pass
+
+        if trip is None:
+            print(f"Skipping trip {tid}: directory not found.")
+            continue
+
+        loaded_trips.append(trip)
+        print(f"--> Generating map for Trip {tid} ({len(trip.track)} GPS observations)...")
+        # Run ML model prediction
+        pred_route = predict_trip_route(trip, model_path=model_path)
+        out_file = os.path.join(output_dir, f"trip_{tid}.html")
+        create_trip_folium_map(trip, predicted_arcs=pred_route, output_html_path=out_file)
+
+    # Generate multi-trip auto-fly map
+    if len(loaded_trips) > 0:
+        multi_map_path = os.path.join(output_dir, "multi_trip_comparison.html")
+        create_multi_trip_folium_map(loaded_trips[:5], output_html_path=multi_map_path)
+
+    # Generate navigator hub
+    available_tids = [t.trip_id for t in loaded_trips]
+    hub_path = os.path.join(output_dir, "trip_navigator.html")
+    create_trip_navigator_html(available_tids, output_html_path=hub_path)
+    print("All Folium visualization maps regenerated successfully with ML Predicted Routes!")
+
+
+if __name__ == "__main__":
+    generate_all_visualizations()
